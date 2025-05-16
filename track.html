@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tracking Link Creator & Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  header {
+    padding: 2rem 1rem 1rem;
+    text-align: center;
+    max-width: 600px;
+  }
+  header h1 {
+    font-weight: 600;
+    font-size: 2.5rem;
+    margin-bottom: 0.25rem;
+  }
+  header p {
+    font-weight: 400;
+    font-size: 1.1rem;
+    color: #d1d5db;
+  }
+  main {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 14px;
+    padding: 2rem;
+    margin: 2rem 1rem;
+    width: 100%;
+    max-width: 600px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+  }
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+  input[type="text"] {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    border: none;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    outline: none;
+  }
+  button {
+    background: #fff;
+    color: #553c9a;
+    border: none;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background-color 0.25s ease;
+    box-shadow: 0 4px 12px rgb(255 255 255 / 0.4);
+    user-select: none;
+  }
+  button:hover {
+    background: #f0e6ff;
+  }
+  .tracking-link {
+    background: rgba(0,0,0,0.15);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-family: monospace;
+    word-break: break-all;
+    user-select: all;
+    margin-bottom: 1rem;
+  }
+  .log-section {
+    margin-top: 2rem;
+  }
+  .log-title {
+    font-weight: 700;
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 2px solid #a78bfa;
+    padding-bottom: 0.3rem;
+  }
+  .visit-log {
+    max-height: 200px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.15);
+    border-radius: 10px;
+    padding: 1rem;
+  }
+  .visit-entry {
+    padding: 0.4rem 0.2rem;
+    border-bottom: 1px solid #aaa4;
+    font-size: 0.9rem;
+  }
+  .visit-entry:last-child {
+    border-bottom: none;
+  }
+  .location-info {
+    margin-top: 1rem;
+    background: rgba(0,0,0,0.3);
+    padding: 1.2rem 1rem;
+    border-radius: 12px;
+  }
+  a {
+    color: #d6bcfa;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  footer {
+    margin: 3rem 0 1rem;
+    font-size: 0.8rem;
+    color: #d1d5dbaa;
+  }
+  @media (max-width: 480px) {
+    main {
+      margin: 1rem;
+      padding: 1.5rem;
+    }
+    header h1 {
+      font-size: 2rem;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tracking Link Creator & Tracker</h1>
+  <p>Create tracking links and see where visitors open them</p>
+</header>
+<main id="app">
+  <!-- Main app content will be injected by JavaScript -->
+</main>
+<footer>
+  &copy; 2024 Tracking Tool • Made with 💜
+</footer>
+
+<script>
+(() => {
+  const app = document.getElementById('app');
+  const TRACKING_PARAM = 'tid';
+
+  // LocalStorage keys
+  const LINKS_KEY = 'tracking_links';
+  const VISITS_KEY_PREFIX = 'tracking_visits_';
+
+  // Helper: Retrieve query param
+  function getQueryParam(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+  }
+
+  // Save and Load links from localStorage as array of objects: {id, label, createdAt}
+  function saveLinks(links) {
+    try {
+      localStorage.setItem(LINKS_KEY, JSON.stringify(links));
+    } catch(e) {}
+  }
+  function loadLinks() {
+    try {
+      const data = localStorage.getItem(LINKS_KEY);
+      if (!data) return [];
+      return JSON.parse(data);
+    } catch(e) {
+      return [];
+    }
+  }
+
+  // Save and Load visits for a tracking ID as array of objects of visitor info
+  function saveVisits(tid, visits) {
+    try {
+      localStorage.setItem(VISITS_KEY_PREFIX + tid, JSON.stringify(visits));
+    } catch(e) {}
+  }
+  function loadVisits(tid) {
+    try {
+      const data = localStorage.getItem(VISITS_KEY_PREFIX + tid);
+      if (!data) return [];
+      return JSON.parse(data);
+    } catch(e) {
+      return [];
+    }
+  }
+
+  // Generate a unique ID for tracking link (simple random)
+  function generateId() {
+    return Math.random().toString(36).substr(2, 10);
+  }
+
+  // Escape HTML for safe rendering
+  function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, function(m) {
+      return {'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[m];
+    });
+  }
+
+  // Format date to readable
+  function formatDate(dateStr) {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleString();
+    } catch {
+      return dateStr;
+    }
+  }
+
+  // Build a tracking URL with given id
+  function buildTrackingUrl(tid) {
+    const base = window.location.origin + window.location.pathname;
+    return `${base}?${TRACKING_PARAM}=${tid}`;
+  }
+
+  // Fetch visitor IP-based location info from IP geolocation API (ipapi.co)
+  async function fetchLocation() {
+    try {
+      const res = await fetch('https://ipapi.co/json/');
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      return {
+        ip: data.ip || 'Unknown',
+        city: data.city || '',
+        region: data.region || '',
+        country: data.country_name || '',
+        postal: data.postal || '',
+        timezone: data.timezone || '',
+        latitude: data.latitude || '',
+        longitude: data.longitude || '',
+        org: data.org || '',
+      };
+    } catch(e) {
+      return null;
+    }
+  }
+
+  // Render app main view: creation + logs + instructions
+  function renderMainView() {
+    const links = loadLinks();
+
+    app.innerHTML = `
+      <form id="linkForm" autocomplete="off">
+        <label for="labelInput">Label for your tracking link (optional):</label>
+        <input id="labelInput" name="label" type="text" placeholder="e.g. Email Campaign, Client A" maxlength="50" />
+        <button type="submit">Create Tracking Link</button>
+      </form>
+
+      <section id="linksSection" class="log-section">
+        <h2 class="log-title">Your Tracking Links</h2>
+        <div id="linksList">
+          ${links.length === 0 ? '<p>No tracking links created yet.</p>' : ''}
+          ${links.map(link => {
+            const url = buildTrackingUrl(link.id);
+            return `<div class="tracking-link">
+              <strong>${escapeHTML(link.label || '(No label)')}</strong><br />
+              <a href="${url}" target="_blank" rel="noreferrer noopener">${url}</a><br />
+              Created: ${formatDate(link.createdAt)}<br />
+              <a href="#" class="show-visits" data-id="${link.id}">Show Visits</a>
+            </div>`;
+          }).join('')}
+        </div>
+      </section>
+
+      <section id="visitLogs" class="log-section" style="display:none;">
+        <h2 class="log-title">Visitor Logs</h2>
+        <button id="backToLinks" style="margin-bottom:1rem;">&larr; Back to Links</button>
+        <div id="visitList" class="visit-log"></div>
+      </section>
+    `;
+
+    // Form submit
+    const form = document.getElementById('linkForm');
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const labelInput = form.label.value.trim();
+      createNewTrackingLink(labelInput);
+    });
+
+    // Add visit show handlers
+    const showVisitLinks = app.querySelectorAll('.show-visits');
+    showVisitLinks.forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        const tid = e.target.dataset.id;
+        showVisits(tid);
+      });
+    });
+  }
+
+  // Create new tracking link and save it
+  function createNewTrackingLink(label) {
+    const links = loadLinks();
+    const id = generateId();
+    const createdAt = new Date().toISOString();
+    links.push({ id, label, createdAt });
+    saveLinks(links);
+    renderMainView();
+    alert(`Tracking link created:\n${buildTrackingUrl(id)}\n\nShare this link to track visits.`);
+  }
+
+  // Show visits for a tracking id
+  function showVisits(tid) {
+    const visits = loadVisits(tid);
+    const visitLogsSection = document.getElementById('visitLogs');
+    const linksSection = document.getElementById('linksSection');
+    const visitList = document.getElementById('visitList');
+
+    visitList.innerHTML = '';
+    if (visits.length === 0) {
+      visitList.innerHTML = '<p>No visits recorded yet for this link.</p>';
+    } else {
+      visits.slice().reverse().forEach((vis, idx) => {
+        const timeStr = formatDate(vis.timestamp);
+        const locationStr = `${escapeHTML(vis.city)}${vis.region ? ', ' + escapeHTML(vis.region) : ''}${vis.country ? ', ' + escapeHTML(vis.country) : ''}`.trim();
+        const ipStr = escapeHTML(vis.ip || '');
+        const orgStr = escapeHTML(vis.org || '');
+        visitList.innerHTML += `
+          <div class="visit-entry">
+            <strong>Time:</strong> ${timeStr}<br/>
+            <strong>Location:</strong> ${locationStr || 'Unknown'}<br/>
+            <strong>IP:</strong> ${ipStr}<br/>
+            ${orgStr ? `<strong>ISP:</strong> ${orgStr}<br/>` : ''}
+            ${vis.latitude && vis.longitude ? `<a href="https://www.google.com/maps?q=${vis.latitude},${vis.longitude}" target="_blank" rel="noreferrer noopener">View on Map</a>` : ''}
+          </div>
+        `;
+      });
+    }
+
+    visitLogsSection.style.display = 'block';
+    linksSection.style.display = 'none';
+
+    document.getElementById('backToLinks').onclick = () => {
+      visitLogsSection.style.display = 'none';
+      linksSection.style.display = 'block';
+    };
+  }
+
+  // Run this if URL has tracking parameter
+  async function trackVisit(tid) {
+    app.innerHTML = `
+      <h2>Tracking Link Visited</h2>
+      <p>Tracking ID: <strong>${escapeHTML(tid)}</strong></p>
+      <p>Fetching your location info...</p>
+      <div id="locationInfo" class="location-info"></div>
+    `;
+
+    const locationInfoDiv = document.getElementById('locationInfo');
+
+    const loc = await fetchLocation();
+    if (!loc) {
+      locationInfoDiv.innerHTML = '<p><em>Failed to fetch location details.</em></p>';
+      return;
+    }
+
+    // Show location summary
+    locationInfoDiv.innerHTML = `
+      <p><strong>IP Address:</strong> ${escapeHTML(loc.ip)}</p>
+      <p><strong>City:</strong> ${escapeHTML(loc.city)}</p>
+      <p><strong>Region:</strong> ${escapeHTML(loc.region)}</p>
+      <p><strong>Country:</strong> ${escapeHTML(loc.country)}</p>
+      <p><strong>Postal Code:</strong> ${escapeHTML(loc.postal)}</p>
+      <p><strong>Timezone:</strong> ${escapeHTML(loc.timezone)}</p>
+      ${loc.latitude && loc.longitude ? `<p><a href="https://www.google.com/maps?q=${loc.latitude},${loc.longitude}" target="_blank" rel="noreferrer noopener">View on Google Maps</a></p>` : ''}
+      <p><em>Thank you for visiting this tracking link.</em></p>
+    `;
+
+    // Log visit in localStorage - add to visits array for this tid
+    const visits = loadVisits(tid);
+    visits.push({
+      timestamp: new Date().toISOString(),
+      ip: loc.ip,
+      city: loc.city,
+      region: loc.region,
+      country: loc.country,
+      postal: loc.postal,
+      timezone: loc.timezone,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      org: loc.org,
+    });
+    saveVisits(tid, visits);
+  }
+
+  // Entry point
+  function init() {
+    const tid = getQueryParam(TRACKING_PARAM);
+
+    if (tid) {
+      // Tracking mode
+      trackVisit(tid);
+    } else {
+      // Main page mode
+      renderMainView();
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
+
